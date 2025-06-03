@@ -1,0 +1,101 @@
+# Multi-stage Dockerfile for motea
+# Based on the open-source project Notea, originally created by qingwei-li<cinwell.li@gmail.com>
+# Modified and maintained by waycaan, 2025.
+
+# Build arguments
+ARG BUILDTIME
+ARG VERSION
+ARG REVISION
+
+# Stage 1: Dependencies
+FROM node:18-alpine AS deps
+WORKDIR /app
+
+# Install dependencies needed for native modules
+RUN apk add --no-cache libc6-compat
+
+# Copy package files
+COPY package.json package-lock.json ./
+
+# Install production dependencies only
+RUN npm ci --only=production --ignore-scripts && npm cache clean --force
+
+# Stage 2: Builder
+FROM node:18-alpine AS builder
+WORKDIR /app
+
+# Install dependencies needed for building
+RUN apk add --no-cache libc6-compat
+
+# Copy package files
+COPY package.json package-lock.json ./
+
+# Install all dependencies (including devDependencies)
+RUN npm ci --ignore-scripts && npm cache clean --force
+
+# Copy source code
+COPY . .
+
+# Set build-time environment variables
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
+
+# Build the application
+RUN npm run build
+
+# Stage 3: Runner
+FROM node:18-alpine AS runner
+WORKDIR /app
+
+# Create non-root user
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+
+# Install runtime dependencies
+RUN apk add --no-cache \
+    dumb-init \
+    curl \
+    && rm -rf /var/cache/apk/*
+
+# Copy built application
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+
+# Copy health check script
+COPY --from=builder /app/healthcheck.js ./
+
+# Copy production dependencies (only if needed by standalone build)
+# COPY --from=deps /app/node_modules ./node_modules
+
+# Set correct permissions
+RUN chown -R nextjs:nodejs /app
+USER nextjs
+
+# Expose port
+EXPOSE 3000
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Add build metadata as labels
+LABEL org.opencontainers.image.title="motea"
+LABEL org.opencontainers.image.description="A note-taking application based on Notea"
+LABEL org.opencontainers.image.version="${VERSION}"
+LABEL org.opencontainers.image.created="${BUILDTIME}"
+LABEL org.opencontainers.image.revision="${REVISION}"
+LABEL org.opencontainers.image.source="https://github.com/your-username/notea"
+LABEL org.opencontainers.image.authors="waycaan"
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD node healthcheck.js
+
+# Use dumb-init to handle signals properly
+ENTRYPOINT ["dumb-init", "--"]
+
+# Start the application
+CMD ["node", "server.js"]

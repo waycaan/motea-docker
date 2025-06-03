@@ -19,4 +19,10 @@ module.exports = withPWA({
     typescript: {
         ignoreBuildErrors: true,
     },
+    // Enable standalone output for Docker
+    output: 'standalone',
+    // Optimize for production
+    experimental: {
+        outputFileTracingRoot: __dirname,
+    },
 });

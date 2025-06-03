@@ -16,19 +16,21 @@
 - 🖼️ 去除本地图片上传，采用 Markdown 图片链接渲染方式，编辑体验更接近 Typora；
 - 📦 如需图床支持，可参考我的另一个原创项目 [Mazine](https://github.com/waycaan/mazine)。
 
-## 🚀 部署方式（推荐 Vercel + Neon）
+## 🚀 部署方式
+
+### 方式一：Vercel + Neon（推荐）
 
 > 为获得最佳体验，请使用 **Neon 数据库 Washington, D.C., USA (East)** 区域节点。因大部分用户使用 Vercel 免费计划（主机位于美国），使用该节点可获得最低延迟。
 
-### 1. Fork 本项目
+#### 1. Fork 本项目
 
 点击右上角 `Fork`，将项目复制到你的 GitHub 账户下。
 
-### 2. 导入至 Vercel
+#### 2. 导入至 Vercel
 
 登录 [Vercel](https://vercel.com)，点击 `Import Project`，选择刚刚 Fork 的仓库。
 
-### 3. 设置环境变量
+#### 3. 设置环境变量
 
 在 Vercel 项目的 `Settings > Environment Variables` 页面，添加以下变量：
 
@@ -38,13 +40,59 @@
 | `PASSWORD`          | 登录密码（任意设置）            |
 | `PRELOAD_NOTES_COUNT` | `10`（预加载笔记条数）        |
 
-### 4. 部署
+#### 4. 部署
 
 点击 `Deploy` 开始部署，初次部署大约需 **2 分钟**。完成后即可访问。
 
----
-计划
-增加docker本地部署。所以你看到部分代码和config文件中存在supabase和自建postgresql的选项。
+### 方式二：Docker 部署 🐳
+
+支持 X86_64 和 ARM64 架构，适合自建服务器或本地开发。
+
+#### 快速开始
+
+```bash
+# 使用预构建镜像
+docker run -d \
+  --name motea \
+  -p 3000:3000 \
+  -e DATABASE_URL="your_database_url" \
+  -e PASSWORD="your_password" \
+  ghcr.io/your-username/notea/motea:latest
+```
+
+#### 使用 Docker Compose（推荐）
+
+```bash
+# 1. 复制环境变量文件
+cp .env.example .env.local
+
+# 2. 编辑配置文件
+# 编辑 .env.local 设置数据库和认证信息
+
+# 3. 启动服务
+docker-compose up -d
+
+# 4. 访问应用
+# http://localhost:3000
+```
+
+#### 本地构建
+
+```bash
+# 构建镜像
+make build
+
+# 运行容器
+make run
+
+# 查看日志
+make logs
+
+# 停止服务
+make stop
+```
+
+详细的 Docker 部署说明请参考 [DOCKER.md](./DOCKER.md)。
 
 ## 📝 协议
 
