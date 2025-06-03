@@ -95,6 +95,14 @@ test: ## Test Docker image
 		$(FULL_IMAGE_NAME) \
 		node -e "console.log('Image test passed')"
 
+test-deps: ## Test dependency resolution
+	@echo "Testing dependency resolution..."
+	@if command -v bash >/dev/null 2>&1; then \
+		bash ../test-dependency-fix.sh; \
+	else \
+		powershell -ExecutionPolicy Bypass -File ../test-dependency-fix.ps1; \
+	fi
+
 compose-up: ## Start services with Docker Compose
 	docker-compose up -d
 
