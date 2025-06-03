@@ -14,8 +14,8 @@ WORKDIR /app
 # Install dependencies needed for native modules
 RUN apk add --no-cache libc6-compat
 
-# Copy package files
-COPY package.json package-lock.json ./
+# Copy package files and npm configuration
+COPY package.json package-lock.json .npmrc ./
 
 # Install production dependencies only
 RUN npm ci --only=production --ignore-scripts && npm cache clean --force
@@ -27,8 +27,8 @@ WORKDIR /app
 # Install dependencies needed for building
 RUN apk add --no-cache libc6-compat
 
-# Copy package files
-COPY package.json package-lock.json ./
+# Copy package files and npm configuration
+COPY package.json package-lock.json .npmrc ./
 
 # Install all dependencies (including devDependencies)
 RUN npm ci --ignore-scripts && npm cache clean --force
