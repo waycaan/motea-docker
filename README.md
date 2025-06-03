@@ -94,6 +94,51 @@ make stop
 
 详细的 Docker 部署说明请参考 [DOCKER.md](./DOCKER.md)。
 
+## ⚙️ 配置管理
+
+motea 提供了强大的配置管理工具，支持多种数据库提供商：
+
+### 自动配置（推荐）
+
+```bash
+# 交互式配置设置
+node scripts/config-manager.js
+
+# Windows PowerShell
+.\scripts\config-manager.ps1
+
+# 或使用 Makefile
+make config-setup
+```
+
+### 快速配置
+
+```bash
+# Neon PostgreSQL（推荐用于 Vercel）
+make config-neon
+
+# Supabase PostgreSQL
+make config-supabase
+
+# 自建 PostgreSQL
+make config-self-hosted
+```
+
+### 配置验证
+
+```bash
+# 验证当前配置
+make config-validate
+```
+
+### 支持的数据库
+
+- **Neon PostgreSQL** - 无服务器，推荐用于生产环境
+- **Supabase PostgreSQL** - 功能丰富的后端服务
+- **自建 PostgreSQL** - 完全控制，适合本地开发
+
+详细的配置说明请参考 [CONFIG.md](./CONFIG.md)。
+
 ## 📝 协议
 
 本项目基于 [Notea](https://github.com/notea-org/notea) 开源项目开发，遵循其 MIT License。原始版权声明已完整保留，感谢原作者的开源贡献。
