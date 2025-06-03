@@ -5,14 +5,10 @@ on:
     branches:
       - main
       - master
-    paths:
-      - 'motea/**'
   pull_request:
     branches:
       - main
       - master
-    paths:
-      - 'motea/**'
   release:
     types: [published]
   workflow_dispatch:
@@ -59,7 +55,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./motea
+          context: .
           platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
@@ -74,18 +70,36 @@ jobs:
       - name: Test Docker image
         if: github.event_name == 'pull_request'
         run: |
+          # Get the first tag from the metadata output
+          IMAGE_TAG=$(echo "${{ steps.meta.outputs.tags }}" | head -n1)
+          echo "Testing image: $IMAGE_TAG"
+
+          # Load the image for testing (since we're not pushing in PR)
+          docker buildx build \
+            --context . \
+            --platform linux/amd64 \
+            --tag motea:test \
+            --load .
+
+          # Test basic functionality
+          docker run --rm \
+            -e NODE_ENV=production \
+            -e DISABLE_PASSWORD=true \
+            motea:test \
+            node -e "console.log('Image test passed')"
+
+          # Test container startup
           docker run --rm -d --name motea-test \
             -p 3000:3000 \
             -e NODE_ENV=production \
             -e DISABLE_PASSWORD=true \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
-          
+            motea:test
+
           # Wait for container to start
           sleep 30
-          
+
           # Test health endpoint
           curl -f http://localhost:3000/api/health || exit 1
-          
+
           # Cleanup
           docker stop motea-test
-
