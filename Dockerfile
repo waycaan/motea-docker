@@ -15,10 +15,10 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat
 
 # Copy package files and npm configuration
-COPY package.json package-lock.json .npmrc ./
+COPY package.json .npmrc ./
 
 # Install production dependencies only
-RUN npm ci --only=production --ignore-scripts && npm cache clean --force
+RUN npm install --only=production --ignore-scripts && npm cache clean --force
 
 # Stage 2: Builder
 FROM node:18-alpine AS builder
@@ -28,10 +28,10 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat
 
 # Copy package files and npm configuration
-COPY package.json package-lock.json .npmrc ./
+COPY package.json .npmrc ./
 
 # Install all dependencies (including devDependencies)
-RUN npm ci --ignore-scripts && npm cache clean --force
+RUN npm install --ignore-scripts && npm cache clean --force
 
 # Copy source code
 COPY . .
