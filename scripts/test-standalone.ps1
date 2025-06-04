@@ -3,7 +3,7 @@
 # Modified and maintained by waycaan, 2025.
 
 param(
-    [string]$ImageName = "motea-standalone",
+    [string]$ImageName = "motea",
     [string]$ContainerName = "motea-test",
     [int]$TestPort = 3001
 )

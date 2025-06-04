@@ -9,7 +9,7 @@ param(
 # Configuration
 $Registry = "ghcr.io"
 $Owner = "waycaan"
-$ImageName = "motea-standalone"
+$ImageName = "motea"
 $FullImageName = "$Registry/$Owner/$ImageName`:$Tag"
 
 Write-Host "Using pre-built motea standalone image from GitHub..." -ForegroundColor Blue
@@ -35,7 +35,7 @@ if (-not (Test-Path "motea.conf")) {
 Write-Host "Starting container..." -ForegroundColor Blue
 $currentDir = (Get-Location).Path
 docker run -d `
-    --name motea-standalone `
+    --name motea `
     -p 3000:3000 `
     -v motea_data:/data `
     -v "$currentDir/motea.conf:/app/motea.conf:ro" `
@@ -46,7 +46,7 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "Container started successfully!" -ForegroundColor Green
     Write-Host "Application: http://localhost:3000" -ForegroundColor Blue
     Write-Host "Please edit motea.conf and restart container if needed:" -ForegroundColor Yellow
-    Write-Host "docker restart motea-standalone" -ForegroundColor Yellow
+    Write-Host "docker restart motea" -ForegroundColor Yellow
 } else {
     Write-Host "Failed to start container" -ForegroundColor Red
     exit 1

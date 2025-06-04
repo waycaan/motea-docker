@@ -14,7 +14,7 @@ NC='\033[0m' # No Color
 # Configuration
 REGISTRY="ghcr.io"
 OWNER="waycaan"
-IMAGE_NAME="motea-standalone"
+IMAGE_NAME="motea"
 TAG="${1:-latest}"
 FULL_IMAGE_NAME="${REGISTRY}/${OWNER}/${IMAGE_NAME}:${TAG}"
 
@@ -35,7 +35,7 @@ fi
 # Run the container
 echo -e "${BLUE}Starting container...${NC}"
 docker run -d \
-    --name motea-standalone \
+    --name motea \
     -p 3000:3000 \
     -v motea_data:/data \
     -v "$(pwd)/motea.conf:/app/motea.conf:ro" \
@@ -45,4 +45,4 @@ docker run -d \
 echo -e "${GREEN}Container started successfully!${NC}"
 echo -e "${BLUE}Application: http://localhost:3000${NC}"
 echo -e "${YELLOW}Please edit motea.conf and restart container if needed:${NC}"
-echo -e "${YELLOW}docker restart motea-standalone${NC}"
+echo -e "${YELLOW}docker restart motea${NC}"

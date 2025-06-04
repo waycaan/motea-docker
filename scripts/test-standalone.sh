@@ -13,7 +13,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-IMAGE_NAME="motea-standalone"
+IMAGE_NAME="motea"
 CONTAINER_NAME="motea-test"
 TEST_PORT="3001"
 
