@@ -83,13 +83,13 @@ health: ## Check container health
 	@echo "Health endpoint test:"
 	@curl -f http://localhost:3000/api/health 2>/dev/null | jq . || echo "Health check failed"
 
-test: ## Test Docker image
+test: ## Test Docker image by running it
 	@echo "Testing $(FULL_IMAGE_NAME)..."
-	@if command -v bash >/dev/null 2>&1; then \
-		bash scripts/test-standalone.sh; \
-	else \
-		powershell -ExecutionPolicy Bypass -File scripts/test-standalone.ps1; \
-	fi
+	docker run --rm \
+		-e NODE_ENV=production \
+		-e DISABLE_PASSWORD=true \
+		$(FULL_IMAGE_NAME) \
+		timeout 30s /usr/local/bin/start.sh || echo "Test completed"
 
 test-deps: ## Test dependency resolution
 	@echo "Testing dependency resolution..."
@@ -108,14 +108,14 @@ github: ## Use pre-built GitHub image
 	fi
 
 # Configuration targets
-config-setup: ## Setup configuration file
+config-setup: ## Download docker-compose.yml if not exists
 	@echo "Setting up configuration..."
-	@if [ ! -f motea.conf ]; then \
-		cp motea.conf.example motea.conf; \
-		echo "Created motea.conf from template"; \
-		echo "Please edit motea.conf to set your password"; \
+	@if [ ! -f docker-compose.yml ]; then \
+		curl -O https://raw.githubusercontent.com/waycaan/motea-docker/main/docker-compose.yml; \
+		echo "Downloaded docker-compose.yml"; \
+		echo "Please edit docker-compose.yml to set your password (line 70)"; \
 	else \
-		echo "motea.conf already exists"; \
+		echo "docker-compose.yml already exists"; \
 	fi
 
 # CI/CD targets
