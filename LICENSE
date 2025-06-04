@@ -1,6 +1,11 @@
 MIT License
 
-Copyright (c) 2021 qingwei-li<cinwell.li@gmail.com>
+Original work Copyright (c) 2021 qingwei-li<cinwell.li@gmail.com>
+Modified work Copyright (c) 2025 waycaan
+
+This project (motea) is based on Notea by qingwei-li, with significant
+modifications and enhancements by waycaan. The original MIT license terms
+apply to the original work, and the same terms apply to the modifications.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

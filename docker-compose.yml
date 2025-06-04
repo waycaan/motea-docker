@@ -1,4 +1,4 @@
-# Docker Compose for motea local development and testing
+# Docker Compose for motea standalone deployment
 # Based on the open-source project Notea, originally created by qingwei-li<cinwell.li@gmail.com>
 # Modified and maintained by waycaan, 2025.
 
@@ -9,42 +9,57 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        BUILDTIME: ${BUILDTIME:-}
+        VERSION: ${VERSION:-latest}
+        REVISION: ${REVISION:-}
+    container_name: motea
     ports:
       - "3000:3000"
     environment:
+      # Basic configuration
       - NODE_ENV=production
-      - DATABASE_URL=${DATABASE_URL}
-      - PASSWORD=${PASSWORD}
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+      - NEXT_TELEMETRY_DISABLED=1
+
+      # Database (embedded PostgreSQL)
+      - DATABASE_URL=postgresql://motea:motea@localhost:5432/motea
+      - PGDATA=/data
+
+      # Authentication
+      - PASSWORD=${PASSWORD:-motea}
       - DISABLE_PASSWORD=${DISABLE_PASSWORD:-false}
-    env_file:
-      - .env.local
+
+      # Performance
+      - PRELOAD_NOTES_COUNT=${PRELOAD_NOTES_COUNT:-10}
+
+    volumes:
+      # Persist PostgreSQL data
+      - motea_data:/data
+
+      # Configuration file mapping (optional)
+      - ./motea.conf:/app/motea.conf:ro
+
     restart: unless-stopped
+
     healthcheck:
-      test: ["CMD", "node", "healthcheck.js"]
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
-    depends_on:
-      postgres:
-        condition: service_healthy
+      start_period: 60s
 
-  postgres:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_DB: motea
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
 
 volumes:
-  postgres_data:
+  motea_data:
+    driver: local

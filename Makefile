@@ -4,7 +4,7 @@
 # Variables
 IMAGE_NAME ?= motea
 TAG ?= latest
-REGISTRY ?= ghcr.io/your-username/notea
+REGISTRY ?= ghcr.io/waycaan/motea-docker
 FULL_IMAGE_NAME = $(IMAGE_NAME):$(TAG)
 REGISTRY_IMAGE_NAME = $(REGISTRY)/$(IMAGE_NAME):$(TAG)
 
@@ -18,7 +18,7 @@ BUILD_ARGS = --build-arg BUILDTIME=$(BUILD_TIME) \
              --build-arg VERSION=$(VERSION) \
              --build-arg REVISION=$(REVISION)
 
-.PHONY: help build build-local build-multi push run stop clean logs health test
+.PHONY: help build build-multi push run stop clean logs health test up down config-setup
 
 # Default target
 help: ## Show this help message
@@ -26,10 +26,8 @@ help: ## Show this help message
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 build: ## Build Docker image for local platform
-	@echo "Building $(FULL_IMAGE_NAME) for local platform..."
+	@echo "Building $(FULL_IMAGE_NAME) with embedded PostgreSQL..."
 	docker build $(BUILD_ARGS) -t $(FULL_IMAGE_NAME) .
-
-build-local: build ## Alias for build
 
 build-multi: ## Build Docker image for multiple platforms (requires buildx)
 	@echo "Building $(FULL_IMAGE_NAME) for multiple platforms..."
@@ -50,35 +48,33 @@ push: ## Push Docker image to registry
 	docker tag $(FULL_IMAGE_NAME) $(REGISTRY_IMAGE_NAME)
 	docker push $(REGISTRY_IMAGE_NAME)
 
-run: ## Run Docker container
+run: ## Run Docker container directly
 	@echo "Running $(FULL_IMAGE_NAME)..."
 	docker run -d \
 		--name motea \
 		-p 3000:3000 \
-		--env-file .env.local \
-		$(FULL_IMAGE_NAME)
-
-run-dev: ## Run Docker container with development settings
-	@echo "Running $(FULL_IMAGE_NAME) in development mode..."
-	docker run -d \
-		--name motea-dev \
-		-p 3000:3000 \
-		-e NODE_ENV=development \
-		-e DISABLE_PASSWORD=true \
+		-v motea_data:/data \
+		-v ./motea.conf:/app/motea.conf:ro \
 		$(FULL_IMAGE_NAME)
 
 stop: ## Stop and remove Docker container
 	@echo "Stopping motea container..."
-	-docker stop motea motea-dev 2>/dev/null
-	-docker rm motea motea-dev 2>/dev/null
+	-docker stop motea 2>/dev/null
+	-docker rm motea 2>/dev/null
 
 clean: stop ## Clean up Docker images and containers
 	@echo "Cleaning up Docker images..."
 	-docker rmi $(FULL_IMAGE_NAME) 2>/dev/null
 	-docker system prune -f
 
+up: ## Start services with Docker Compose
+	docker-compose up -d
+
+down: ## Stop services with Docker Compose
+	docker-compose down
+
 logs: ## Show container logs
-	docker logs -f motea
+	docker-compose logs -f
 
 health: ## Check container health
 	@echo "Checking container health..."
@@ -89,11 +85,11 @@ health: ## Check container health
 
 test: ## Test Docker image
 	@echo "Testing $(FULL_IMAGE_NAME)..."
-	docker run --rm \
-		-e NODE_ENV=production \
-		-e DISABLE_PASSWORD=true \
-		$(FULL_IMAGE_NAME) \
-		node -e "console.log('Image test passed')"
+	@if command -v bash >/dev/null 2>&1; then \
+		bash scripts/test-standalone.sh; \
+	else \
+		powershell -ExecutionPolicy Bypass -File scripts/test-standalone.ps1; \
+	fi
 
 test-deps: ## Test dependency resolution
 	@echo "Testing dependency resolution..."
@@ -103,51 +99,24 @@ test-deps: ## Test dependency resolution
 		powershell -ExecutionPolicy Bypass -File ../test-dependency-fix.ps1; \
 	fi
 
-compose-up: ## Start services with Docker Compose
-	docker-compose up -d
+github: ## Use pre-built GitHub image
+	@echo "Using pre-built GitHub image..."
+	@if command -v bash >/dev/null 2>&1; then \
+		bash scripts/use-github-image.sh; \
+	else \
+		powershell -ExecutionPolicy Bypass -File scripts/use-github-image.ps1; \
+	fi
 
-compose-down: ## Stop services with Docker Compose
-	docker-compose down
-
-compose-logs: ## Show Docker Compose logs
-	docker-compose logs -f
-
-# Development targets
-dev-setup: ## Setup development environment
-	@echo "Setting up development environment..."
-	cp .env.example .env.local
-	@echo "Please edit .env.local with your configuration"
-	@echo "Or use: make config-setup"
-
-dev-build: ## Build development image
-	$(MAKE) build TAG=dev
-
-dev-run: ## Run development container
-	$(MAKE) run-dev TAG=dev
-
-# Configuration management targets
-config-setup: ## Interactive configuration setup
-	@echo "Starting configuration manager..."
-	node scripts/config-manager.js
-
-config-validate: ## Validate current configuration
-	@echo "Validating configuration..."
-	node scripts/validate-config.js
-
-config-neon: ## Quick setup for Neon PostgreSQL
-	@echo "Setting up Neon PostgreSQL configuration..."
-	cp config/env.neon.example .env.local
-	@echo "Please edit .env.local with your Neon database URL"
-
-config-supabase: ## Quick setup for Supabase PostgreSQL
-	@echo "Setting up Supabase PostgreSQL configuration..."
-	cp config/env.supabase.example .env.local
-	@echo "Please edit .env.local with your Supabase database URL"
-
-config-self-hosted: ## Quick setup for self-hosted PostgreSQL
-	@echo "Setting up self-hosted PostgreSQL configuration..."
-	cp config/env.self-hosted.example .env.local
-	@echo "Please edit .env.local with your database URL"
+# Configuration targets
+config-setup: ## Setup configuration file
+	@echo "Setting up configuration..."
+	@if [ ! -f motea.conf ]; then \
+		cp motea.conf.example motea.conf; \
+		echo "Created motea.conf from template"; \
+		echo "Please edit motea.conf to set your password"; \
+	else \
+		echo "motea.conf already exists"; \
+	fi
 
 # CI/CD targets
 ci-build: ## Build for CI/CD (multi-platform)
