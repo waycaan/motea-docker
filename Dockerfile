@@ -91,10 +91,6 @@ LABEL org.opencontainers.image.source="https://github.com/waycaan/motea-docker"
 LABEL org.opencontainers.image.authors="waycaan"
 LABEL org.opencontainers.image.licenses="MIT"
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD node healthcheck.js
-
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]
 
