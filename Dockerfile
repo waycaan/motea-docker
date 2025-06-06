@@ -62,12 +62,6 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
-# Copy health check script
-COPY --from=builder /app/healthcheck.js ./
-
-# Copy production dependencies (only if needed by standalone build)
-# COPY --from=deps /app/node_modules ./node_modules
-
 # Set correct permissions
 RUN chown -R nextjs:nodejs /app
 USER nextjs
