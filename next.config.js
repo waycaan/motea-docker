@@ -7,8 +7,7 @@ const withPWA = nextPWA({
     disable: developmentEnv,
     dest: 'public',
     runtimeCaching: cache,
-    // Ensure PWA files are properly handled in Docker
-    publicExcludes: ['!static/**/*'],
+    // Don't exclude static files from PWA
     buildExcludes: [/middleware-manifest\.json$/],
 });
 
