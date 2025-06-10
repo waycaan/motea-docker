@@ -58,9 +58,17 @@ RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
 # Copy built application
-COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+
+# Copy public directory explicitly to ensure all static files are available
+COPY --from=builder /app/public ./public
+
+# Verify static files before setting permissions
+RUN echo "=== Verifying static files ===" && \
+    ls -la ./public/ && \
+    ls -la ./public/static/ 2>/dev/null || echo "No static directory found" && \
+    test -f ./public/static/manifest.json && echo "✓ manifest.json found" || echo "✗ manifest.json missing"
 
 # Set correct permissions
 RUN chown -R nextjs:nodejs /app
