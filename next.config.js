@@ -4,11 +4,11 @@ const cache = require('./scripts/cache');
 const developmentEnv = process.env.NODE_ENV === 'development';
 
 const withPWA = nextPWA({
+    // target: process.env.NETLIFY ? 'serverless' : 'server',
+    // mode: process.env.NODE_ENV ?? 'development',
     disable: developmentEnv,
     dest: 'public',
     runtimeCaching: cache,
-    // Don't exclude static files from PWA
-    buildExcludes: [/middleware-manifest\.json$/],
 });
 
 module.exports = withPWA({
@@ -18,22 +18,5 @@ module.exports = withPWA({
     },
     typescript: {
         ignoreBuildErrors: true,
-    },
-    // Enable standalone output for Docker
-    output: 'standalone',
-    // Configure static file serving
-    trailingSlash: false,
-    // Add rewrites to handle static files
-    async rewrites() {
-        return [
-            {
-                source: '/static/:path*',
-                destination: '/static/:path*',
-            },
-        ];
-    },
-    // Optimize for production
-    experimental: {
-        outputFileTracingRoot: __dirname,
     },
 });
