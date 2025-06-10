@@ -1,4 +1,4 @@
-const nextPWA = require('next-pwa');More actions
+const nextPWA = require('next-pwa');
 const cache = require('./scripts/cache');
 
 const developmentEnv = process.env.NODE_ENV === 'development';
