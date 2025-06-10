@@ -1,14 +1,14 @@
-const nextPWA = require('next-pwa');
+const nextPWA = require('next-pwa');More actions
 const cache = require('./scripts/cache');
 
 const developmentEnv = process.env.NODE_ENV === 'development';
 
 const withPWA = nextPWA({
-    // target: process.env.NETLIFY ? 'serverless' : 'server',
-    // mode: process.env.NODE_ENV ?? 'development',
     disable: developmentEnv,
     dest: 'public',
     runtimeCaching: cache,
+    // Don't exclude static files from PWA
+    buildExcludes: [/middleware-manifest\.json$/],
 });
 
 module.exports = withPWA({
@@ -18,5 +18,13 @@ module.exports = withPWA({
     },
     typescript: {
         ignoreBuildErrors: true,
+    },
+    // Enable standalone output for Docker
+    output: 'standalone',
+    // Configure static file serving
+    trailingSlash: false,
+    // Optimize for production
+    experimental: {
+        outputFileTracingRoot: __dirname,
     },
 });
