@@ -23,6 +23,15 @@ module.exports = withPWA({
     output: 'standalone',
     // Configure static file serving
     trailingSlash: false,
+    // Add rewrites to handle static files
+    async rewrites() {
+        return [
+            {
+                source: '/static/:path*',
+                destination: '/static/:path*',
+            },
+        ];
+    },
     // Optimize for production
     experimental: {
         outputFileTracingRoot: __dirname,

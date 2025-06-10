@@ -64,15 +64,18 @@ COPY --from=builder /app/.next/static ./.next/static
 # Copy public directory explicitly to ensure all static files are available
 COPY --from=builder /app/public ./public
 
-# Copy custom server script
-COPY --from=builder /app/server-custom.js ./
+# Create static directory in root and copy static files there
+# This ensures Next.js can serve them correctly
+RUN mkdir -p ./static && \
+    cp -r ./public/static/* ./static/ 2>/dev/null || echo "No static files to copy"
 
 # Verify static files before setting permissions
 RUN echo "=== Verifying static files ===" && \
     ls -la ./public/ && \
-    ls -la ./public/static/ 2>/dev/null || echo "No static directory found" && \
-    test -f ./public/static/manifest.json && echo "✓ manifest.json found" || echo "✗ manifest.json missing" && \
-    test -f ./server-custom.js && echo "✓ Custom server found" || echo "✗ Custom server missing"
+    ls -la ./public/static/ 2>/dev/null || echo "No public/static directory found" && \
+    ls -la ./static/ 2>/dev/null || echo "No root static directory found" && \
+    test -f ./public/static/manifest.json && echo "✓ manifest.json found in public" || echo "✗ manifest.json missing in public" && \
+    test -f ./static/manifest.json && echo "✓ manifest.json found in root" || echo "✗ manifest.json missing in root"
 
 # Set correct permissions
 RUN chown -R nextjs:nodejs /app
@@ -100,5 +103,5 @@ LABEL org.opencontainers.image.licenses="MIT"
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]
 
-# Start the application with custom server
-CMD ["node", "server-custom.js"]
+# Start the application
+CMD ["node", "server.js"]
