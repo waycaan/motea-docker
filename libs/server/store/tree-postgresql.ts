@@ -19,6 +19,7 @@ import { Pool } from 'pg';
 import { createLogger } from 'libs/server/debugging';
 import { TreeModel, DEFAULT_TREE, ROOT_ID, MovePosition, TreeItemModel } from 'libs/shared/tree';
 import TreeActions from 'libs/shared/tree';
+import { NOTE_DELETED, NOTE_SHARED, NOTE_PINNED } from 'libs/shared/meta';
 import { filter, forEach, isNil } from 'lodash';
 
 export interface TreeStoreConfig {
@@ -69,13 +70,16 @@ export class TreeStorePostgreSQL {
             );
 
             if (result.rows.length === 0) {
-                const defaultTree = fixedTree(DEFAULT_TREE);
+                // 🎉 创建包含欢迎笔记的默认树
+                const defaultTreeWithWelcome = this.createDefaultTreeWithWelcome();
+                const defaultTree = fixedTree(defaultTreeWithWelcome);
+
                 await client.query(`
                     INSERT INTO tree_data (id, data, updated_at)
                     VALUES ('main', $1, NOW())
                 `, [JSON.stringify(defaultTree)]);
 
-                this.logger.debug('Initialized default tree');
+                this.logger.debug('Initialized default tree with welcome note');
                 return defaultTree;
             }
 
@@ -148,6 +152,39 @@ export class TreeStorePostgreSQL {
     async deleteItem(id: string): Promise<TreeModel> {
         const tree = await this.get();
         return await this.set(TreeActions.deleteItem(tree, id));
+    }
+
+    /**
+     * 🎉 创建包含欢迎笔记的默认树结构
+     * 这确保了在数据库初始化时，树结构中包含欢迎笔记
+     * 从而保证 /welcome 路由可以被访问，触发 [id].js 编译
+     */
+    private createDefaultTreeWithWelcome(): TreeModel {
+        return {
+            rootId: ROOT_ID,
+            items: {
+                root: {
+                    id: ROOT_ID,
+                    children: ['welcome'], // 🎯 包含欢迎笔记
+                },
+                welcome: {
+                    id: 'welcome',
+                    children: [],
+                    data: {
+                        id: 'welcome',
+                        title: '欢迎使用motea',
+                        pid: 'root',
+                        content: 'welcome',
+                        deleted: NOTE_DELETED.NORMAL,
+                        shared: NOTE_SHARED.PRIVATE,
+                        pinned: NOTE_PINNED.UNPINNED,
+                        editorsize: null,
+                        date: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
+                    }
+                }
+            },
+        };
     }
 
     async close(): Promise<void> {

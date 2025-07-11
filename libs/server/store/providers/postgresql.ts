@@ -139,6 +139,9 @@ export class StorePostgreSQL extends StoreProvider {
             // Create performance indexes
             await this.createPerformanceIndexes(client);
 
+            // 🎉 创建欢迎笔记以确保 [id].js 文件生成
+            await this.createWelcomeNoteIfNotExists(client);
+
             this.tablesInitialized = true;
             this.logger.info('Database tables initialized successfully');
         } catch (error) {
@@ -301,6 +304,11 @@ export class StorePostgreSQL extends StoreProvider {
                 const metadataWithoutId = { ...metadata };
                 delete metadataWithoutId.id;
 
+                // 检测内容格式并设置默认 content type
+                const defaultContentType = content && content.trim().startsWith('{') && content.trim().endsWith('}')
+                    ? 'application/json'
+                    : 'text/markdown';
+
                 await client.query(`
                     INSERT INTO notes (id, path, content, content_type, metadata, updated_at)
                     VALUES ($1, $2, $3, $4, $5, NOW())
@@ -314,7 +322,7 @@ export class StorePostgreSQL extends StoreProvider {
                     noteId,
                     fullPath,
                     content,
-                    options?.contentType || 'text/markdown',
+                    options?.contentType || defaultContentType,
                     JSON.stringify(metadataWithoutId)
                 ]);
 
@@ -547,6 +555,90 @@ export class StorePostgreSQL extends StoreProvider {
             return Promise.all(paths.map(path => this.getObjectAndMeta(path)));
         } finally {
             client.release();
+        }
+    }
+
+    /**
+     * 🎉 创建欢迎笔记以确保 [id].js 文件生成
+     * 这个方法在数据库初始化时调用，静默创建一个 welcome 笔记
+     * 不影响用户体验，用户可以删除这个笔记而不会有任何副作用
+     */
+    private async createWelcomeNoteIfNotExists(client: any): Promise<void> {
+        try {
+            const welcomeNotePath = this.getPath('notes/welcome.md');
+
+            // 检查欢迎笔记是否已存在
+            const existsResult = await client.query(
+                'SELECT 1 FROM notes WHERE path = $1',
+                [welcomeNotePath]
+            );
+
+            if (existsResult.rows.length > 0) {
+                this.logger.debug('Welcome note already exists, skipping creation');
+                return;
+            }
+
+            // 创建欢迎笔记的元数据
+            const currentTime = new Date().toISOString();
+            const welcomeMetadata = {
+                id: 'welcome',
+                title: '欢迎使用motea',
+                pid: 'root',
+                shared: 0,
+                deleted: 0,
+                pinned: 0,
+                editorsize: null,
+                date: currentTime,
+                updated_at: currentTime
+            };
+
+            // 创建JSON格式的欢迎内容
+            const welcomeContent = JSON.stringify({
+                root: {
+                    children: [
+                        {
+                            children: [
+                                {
+                                    detail: 0,
+                                    format: 0,
+                                    mode: "normal",
+                                    style: "",
+                                    text: "欢迎使用motea！",
+                                    type: "text",
+                                    version: 1
+                                }
+                            ],
+                            direction: "ltr",
+                            format: "",
+                            indent: 0,
+                            type: "paragraph",
+                            version: 1
+                        }
+                    ],
+                    direction: "ltr",
+                    format: "",
+                    indent: 0,
+                    type: "root",
+                    version: 1
+                }
+            });
+
+            // 插入欢迎笔记
+            await client.query(`
+                INSERT INTO notes (id, path, content, content_type, metadata, created_at, updated_at)
+                VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+            `, [
+                'welcome',
+                welcomeNotePath,
+                welcomeContent,
+                'application/json',
+                JSON.stringify(welcomeMetadata)
+            ]);
+
+            this.logger.info('🎉 Welcome note created successfully (ID: welcome)');
+        } catch (error) {
+            // 静默处理错误，不影响数据库初始化
+            this.logger.warn('Failed to create welcome note (non-critical):', error);
         }
     }
 

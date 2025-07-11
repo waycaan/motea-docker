@@ -104,7 +104,7 @@ const useNoteTree = (initData: TreeModel = DEFAULT_TREE) => {
 
                 if (cache && item.data?.updated_at && cache.updated_at === item.data.updated_at) {
                     tree.items[item.id].data = {
-                        ...item.data, 
+                        ...item.data,
                         ...cache,
                     };
                     console.log(`✅ Cache hit for other note: ${item.id}`);
@@ -126,7 +126,7 @@ const useNoteTree = (initData: TreeModel = DEFAULT_TREE) => {
                         try {
                             const noteData = await fetchNote(id);
                             tree.items[id].data = {
-                                ...tree.items[id].data, 
+                                ...tree.items[id].data,
                                 ...noteData,
                                 id,
                             } as NoteModel;
@@ -139,23 +139,18 @@ const useNoteTree = (initData: TreeModel = DEFAULT_TREE) => {
             }
 
             console.log(`🎯 Optimization complete: ${priorityNotesToLoad.length} API requests instead of ${allNotes.length}`);
+
             return tree;
         },
         [fetchNote]
     );
 
     const initTree = useCallback(async () => {
-        console.log('🚀 Starting tree initialization...');
-        const startTime = performance.now();
-
         const cache = await uiCache.getItem<TreeModel>(TREE_CACHE_KEY);
         if (cache) {
-            console.log('📦 Loading from cache first...');
             const treeWithNotes = await fetchNotes(cache);
             setTree(treeWithNotes);
         }
-
-        console.log('🌐 Fetching latest tree from server...');
         const tree = await fetchTree();
 
         if (!tree) {
@@ -163,7 +158,7 @@ const useNoteTree = (initData: TreeModel = DEFAULT_TREE) => {
             return;
         }
 
-        console.log('📊 Processing tree with optimized loading...');
+
         const treeWithNotes = await fetchNotes(tree);
 
         setTree(treeWithNotes);
@@ -172,9 +167,7 @@ const useNoteTree = (initData: TreeModel = DEFAULT_TREE) => {
             noteCache.checkItems(tree.items),
         ]);
 
-        const endTime = performance.now();
-        const totalTime = (endTime - startTime) / 1000;
-        console.log(`✅ Tree initialization complete in ${totalTime.toFixed(2)}s`);
+        // Tree initialization complete
 
         setInitLoaded(true);
     }, [fetchNotes, fetchTree, toast]);
