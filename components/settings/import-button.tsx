@@ -7,7 +7,7 @@ import { useRouter } from 'next/router';
 import { ROOT_ID } from 'libs/shared/tree';
 import NoteState from 'libs/web/state/note';
 import { NoteModel } from 'libs/shared/note';
-import markdownProcessor from 'libs/web/utils/markdown-processor';
+import lexicalMarkdownProcessor from 'libs/web/utils/markdown-processor';
 
 const readFileAsText = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -64,11 +64,11 @@ export const ImportButton: FC<ButtonProps> = ({ parentId = ROOT_ID }) => {
                         }
                         console.log(`Created note shell for ${fileName} with ID: ${newNote.id}`);
 
-                        // 2. 处理 markdown 内容，转换为 TipTap 可以理解的格式
-                        const processedContent = markdownProcessor.processImportedContent(markdownContent);
-                        console.log('Processed content for TipTap:', JSON.stringify(processedContent));
+                        // 2. 处理 markdown 内容，前端转换为 JSON 格式
+                        const processedContent = await lexicalMarkdownProcessor.processImportedContent(markdownContent);
+                        console.log('Processed content for Lexical (JSON):', processedContent.substring(0, 200) + '...');
 
-                        // 3. Update the note with processed content using mutateNote
+                        // 3. Update the note with processed JSON content
                         await mutateNote(newNote.id, { content: processedContent });
 
                         console.log(`Successfully imported and saved: ${fileName} (ID: ${newNote.id})`);

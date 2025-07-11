@@ -15,7 +15,7 @@
  * copies or substantial portions of the Software.
  */
 
-import { FC, useState, useEffect, useCallback, useRef } from 'react';
+import { FC, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Button, makeStyles } from '@material-ui/core';
 import {
     EyeIcon,
@@ -24,8 +24,10 @@ import {
     CheckIcon,
     XIcon
 } from '@heroicons/react/outline';
-import TiptapEditorState from 'libs/web/state/tiptap-editor';
+import LexicalEditorState from 'libs/web/state/lexical-editor';
 import noteCache from 'libs/web/cache/note';
+import { setManagedInterval, setManagedTimeout, clearManagedTimer } from 'libs/web/utils/timer-manager';
+import { createContentComparator } from 'libs/web/utils/content-hash';
 
 interface SaveButtonProps {
     className?: string;
@@ -66,10 +68,10 @@ const useStyles = makeStyles({
         },
     },
     syncingButton: {
-        backgroundColor: '#2563EB !important',
+        backgroundColor: '#3185eb !important',
         color: '#FFFFFF !important',
         '&:hover': {
-            backgroundColor: '#1D4ED8 !important',
+            backgroundColor: '#2563EB !important',
         },
     },
     syncedButton: {
@@ -90,10 +92,13 @@ const useStyles = makeStyles({
 
 const SaveButton: FC<SaveButtonProps> = ({ className }) => {
     const classes = useStyles();
-    const { syncToServer, note } = TiptapEditorState.useContainer();
+    const { syncToServer, note } = LexicalEditorState.useContainer();
     const [syncStatus, setSyncStatus] = useState<SyncStatus>('view');
     const syncedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    // 创建内容观察器 - 用于检测IndexedDB内容变化
+    const localContentComparator = useMemo(() => createContentComparator(), []);
 
     useEffect(() => {
         if (!note?.id) return;
@@ -103,20 +108,77 @@ const SaveButton: FC<SaveButtonProps> = ({ className }) => {
         const checkIndexedDBChanges = async () => {
             try {
                 const localNote = await noteCache.getItem(note.id);
-                if (localNote && localNote.content !== note.content) {
-                    if (!isEditing) {
-                        isEditing = true;
-                        setSyncStatus('save');
+                if (localNote) {
+                    // 使用content-hash检测IndexedDB内容是否发生变化
+                    if (localContentComparator.hasChanged(localNote.content)) {
+                        // IndexedDB内容发生了变化，说明编辑器有新的保存
+                        if (localNote.content !== note.content) {
+                            // 且与服务器状态不同，需要保存到服务器
+                            if (!isEditing) {
+                                isEditing = true;
+                                setSyncStatus('save');
+                            }
+                        } else {
+                            // IndexedDB与服务器状态相同，已同步
+                            if (isEditing) {
+                                isEditing = false;
+                                setSyncStatus('view');
+                            }
+                        }
+                    }
+                    // 如果content-hash没有变化，说明IndexedDB内容没变，不需要检查
+                } else {
+                    // 没有本地缓存，设置为view状态
+                    if (isEditing) {
+                        isEditing = false;
+                        setSyncStatus('view');
                     }
                 }
             } catch (error) {
+                // 忽略错误，保持当前状态
             }
         };
 
-        const interval = setInterval(checkIndexedDBChanges, 1000);
+        // 初始化content-hash基准值
+        const initializeComparator = async () => {
+            try {
+                const localNote = await noteCache.getItem(note.id);
+                if (localNote) {
+                    // 设置初始基准，避免第一次检查时误判
+                    localContentComparator.updateBaseline(localNote.content);
+
+                    // 检查初始状态
+                    if (localNote.content !== note.content) {
+                        setSyncStatus('save');
+                        isEditing = true;
+                    } else {
+                        setSyncStatus('view');
+                        isEditing = false;
+                    }
+                } else {
+                    setSyncStatus('view');
+                    isEditing = false;
+                }
+            } catch (error) {
+                setSyncStatus('view');
+                isEditing = false;
+            }
+        };
+
+        // 初始化comparator和状态
+        initializeComparator();
+
+        // 使用定时器定期检查content-hash变化（每秒检查一次）
+        const timerId = `save-button-check-${note.id}`;
+        setManagedInterval(timerId, checkIndexedDBChanges, 1000);
 
         return () => {
-            clearInterval(interval);
+            // 清理定时器
+            clearManagedTimer(timerId);
+            clearManagedTimer(`save-button-sync-timeout-${note?.id || 'unknown'}`);
+            clearManagedTimer(`save-button-synced-timeout-${note?.id || 'unknown'}`);
+
+            // 清理旧的ref定时器（兼容性）
             if (syncedTimeoutRef.current) {
                 clearTimeout(syncedTimeoutRef.current);
             }
@@ -129,6 +191,14 @@ const SaveButton: FC<SaveButtonProps> = ({ className }) => {
     const handleSave = useCallback(async () => {
         setSyncStatus('syncing');
 
+        // 清理之前的定时器
+        const syncTimeoutId = `save-button-sync-timeout-${note?.id || 'unknown'}`;
+        const syncedTimeoutId = `save-button-synced-timeout-${note?.id || 'unknown'}`;
+
+        clearManagedTimer(syncTimeoutId);
+        clearManagedTimer(syncedTimeoutId);
+
+        // 兼容性：清理旧的ref定时器
         if (syncedTimeoutRef.current) {
             clearTimeout(syncedTimeoutRef.current);
         }
@@ -136,40 +206,51 @@ const SaveButton: FC<SaveButtonProps> = ({ className }) => {
             clearTimeout(syncTimeoutRef.current);
         }
 
-        syncTimeoutRef.current = setTimeout(() => {
+        // 设置30秒超时
+        setManagedTimeout(syncTimeoutId, () => {
             setSyncStatus('fail');
-            setTimeout(() => {
+            setManagedTimeout(`${syncTimeoutId}-reset`, () => {
                 setSyncStatus('view');
             }, 2000);
         }, 30000);
 
         try {
-            const success = await syncToServer();
+            await syncToServer();
 
+            // 清理超时定时器
+            const syncTimeoutId = `save-button-sync-timeout-${note?.id || 'unknown'}`;
+            const syncedTimeoutId = `save-button-synced-timeout-${note?.id || 'unknown'}`;
+
+            clearManagedTimer(syncTimeoutId);
+
+            // 兼容性：清理旧的ref定时器
             if (syncTimeoutRef.current) {
                 clearTimeout(syncTimeoutRef.current);
                 syncTimeoutRef.current = null;
             }
 
-            if (success) {
-                setSyncStatus('synced');
+            setSyncStatus('synced');
 
-                syncedTimeoutRef.current = setTimeout(() => {
-                    setSyncStatus('view');
-                }, 3000);
-            } else {
-                setSyncStatus('fail');
-                setTimeout(() => {
-                    setSyncStatus('view');
-                }, 2000);
-            }
+            // 2秒后重置为view状态
+            setManagedTimeout(syncedTimeoutId, () => {
+                setSyncStatus('view');
+            }, 2000);
+
         } catch (error) {
+            // 清理超时定时器
+            const syncTimeoutId = `save-button-sync-timeout-${note?.id || 'unknown'}`;
+            clearManagedTimer(syncTimeoutId);
+
+            // 兼容性：清理旧的ref定时器
             if (syncTimeoutRef.current) {
                 clearTimeout(syncTimeoutRef.current);
                 syncTimeoutRef.current = null;
             }
+
             setSyncStatus('fail');
-            setTimeout(() => {
+
+            // 2秒后重置为view状态
+            setManagedTimeout(`save-button-fail-reset-${note?.id || 'unknown'}`, () => {
                 setSyncStatus('view');
             }, 2000);
         }
