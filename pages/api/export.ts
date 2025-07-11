@@ -11,6 +11,7 @@ import { NOTE_DELETED } from 'libs/shared/meta';
 import { metaToJson } from 'libs/server/meta';
 import { toBuffer } from 'libs/shared/str';
 import { convertHtmlToMarkdown } from 'libs/shared/html-to-markdown';
+import { convertJSONToMarkdown } from 'libs/server/markdown-to-json';
 
 export function escapeFileName(name: string): string {
     // list of characters taken from https://www.mtu.edu/umc/services/websites/writing/characters-avoid/
@@ -48,7 +49,19 @@ export default api()
                 : basePath;
             duplicate[basePath] = (duplicate[basePath] ?? 0) + 1;
 
-            const markdownContent = note.content ? convertHtmlToMarkdown(note.content) : '';
+            // 检测内容格式并转换为markdown
+            let markdownContent = '';
+            if (note.content) {
+                const trimmed = note.content.trim();
+                if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+                    // JSON格式 - 转换为markdown
+                    markdownContent = await convertJSONToMarkdown(note.content);
+                } else {
+                    // HTML格式 - 使用现有的转换器
+                    markdownContent = convertHtmlToMarkdown(note.content);
+                }
+            }
+
             zip.addFile(`${uniquePath}.md`, toBuffer(markdownContent));
             await Promise.all(item.children.map((v) => addItem(v, uniquePath)));
         }

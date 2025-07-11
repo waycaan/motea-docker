@@ -23,9 +23,9 @@ export async function getNote(
 
     return {
         id,
-        content: content || '\n',
+        content: content || '', // 不要默认为 '\n'，让前端处理空内容
         ...jsonMeta,
-        updated_at, 
+        updated_at,
     } as NoteModel;
 }
 
@@ -79,17 +79,21 @@ export default api()
             id: id, 
         };
 
-        console.log('🔧 Notes API updating content for note with title:', updatedMetaJson.title);
+
+
+        // 检测内容格式
+        const isJSON = content && content.trim().startsWith('{') && content.trim().endsWith('}');
+        const contentType = isJSON ? 'application/json' : 'text/markdown';
 
         if (!content || content.trim() === '\\') {
             await req.state.store.copyObject(notePath, notePath + '.bak', {
                 meta: metaWithId,
-                contentType: 'text/markdown',
+                contentType,
             });
         }
 
         await req.state.store.putObject(notePath, content, {
-            contentType: 'text/markdown',
+            contentType,
             meta: metaWithId,
         });
 
@@ -100,6 +104,6 @@ export default api()
             updated_at: new Date().toISOString(),
         };
 
-        console.log('🔧 Notes API returning updated note with title:', updatedNote.title);
+
         res.json(updatedNote);
     });
