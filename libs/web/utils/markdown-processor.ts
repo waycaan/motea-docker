@@ -66,6 +66,162 @@ class LexicalMarkdownProcessor {
     }
 
     /**
+     * 创建与主编辑器相同的转换器配置
+     */
+    private async createEditorTransformers() {
+        // 动态导入所有需要的模块
+        const {
+            TRANSFORMERS,
+            CHECK_LIST,
+            HEADING,
+            QUOTE,
+            CODE,
+            UNORDERED_LIST,
+            ORDERED_LIST,
+            BOLD_ITALIC_STAR,
+            BOLD_STAR,
+            ITALIC_STAR,
+            INLINE_CODE,
+            LINK,
+            HIGHLIGHT,
+            STRIKETHROUGH,
+            ElementTransformer,
+            TextFormatTransformer
+        } = await import('@lexical/markdown');
+
+        const { $isImageNode, ImageNode } = await import('../../../components/editor/nodes/image-node');
+        const { $isHorizontalRuleNode, HorizontalRuleNode } = await import('@lexical/react/LexicalHorizontalRuleNode');
+        const { $isTableNode, $isTableRowNode, $isTableCellNode, TableNode, TableRowNode, TableCellNode } = await import('@lexical/table');
+
+        // 创建自定义转换器（与主编辑器相同）
+        const IMAGE_TRANSFORMER: ElementTransformer = {
+            dependencies: [ImageNode],
+            export: (node) => {
+                if (!$isImageNode(node)) {
+                    return null;
+                }
+                return `![${node.getAltText()}](${node.getSrc()})`;
+            },
+            regExp: /!\[([^\]]*)\]\(([^)]+)\)/,
+            replace: (parentNode, children, match) => {
+                const [, altText, src] = match;
+                const { $createImageNode } = require('../../../components/editor/nodes/image-node');
+                const imageNode = $createImageNode({
+                    altText,
+                    src,
+                    maxWidth: 800,
+                });
+                children.forEach(child => child.remove());
+                parentNode.append(imageNode);
+            },
+            type: 'element',
+        };
+
+        const UNDERLINE_TRANSFORMER: TextFormatTransformer = {
+            format: ['underline'],
+            tag: '<u>',
+            type: 'text-format',
+        };
+
+        const HR_TRANSFORMER: ElementTransformer = {
+            dependencies: [HorizontalRuleNode],
+            export: (node) => {
+                return $isHorizontalRuleNode(node) ? '---' : null;
+            },
+            regExp: /^(---|\*\*\*|___)\s?$/,
+            replace: (parentNode, _children, _match, isImport) => {
+                const { $createHorizontalRuleNode } = require('@lexical/react/LexicalHorizontalRuleNode');
+                const line = $createHorizontalRuleNode();
+                if (isImport || parentNode.getNextSibling() != null) {
+                    parentNode.replace(line);
+                } else {
+                    parentNode.insertBefore(line);
+                }
+                line.selectNext();
+            },
+            type: 'element',
+        };
+
+        const TABLE_TRANSFORMER: ElementTransformer = {
+            dependencies: [TableNode, TableRowNode, TableCellNode],
+            export: (node, traverseChildren) => {
+                if (!$isTableNode(node)) {
+                    return null;
+                }
+
+                const rows = node.getChildren();
+                let markdown = '\n';
+
+                rows.forEach((row, rowIndex) => {
+                    if ($isTableRowNode(row)) {
+                        const cells = row.getChildren();
+                        const cellTexts = cells.map(cell => {
+                            if ($isTableCellNode(cell)) {
+                                return traverseChildren(cell).trim() || ' ';
+                            }
+                            return ' ';
+                        });
+
+                        markdown += '| ' + cellTexts.join(' | ') + ' |\n';
+
+                        // 添加表头分隔符（第一行后）
+                        if (rowIndex === 0) {
+                            markdown += '| ' + cellTexts.map(() => '---').join(' | ') + ' |\n';
+                        }
+                    }
+                });
+
+                return markdown + '\n';
+            },
+            regExp: /^\|(.+)\|$/,
+            replace: (parentNode, children, match, isImport) => {
+                if (!isImport) return false;
+
+                try {
+                    // 简单的表格行处理 - 创建单行表格
+                    const cellsText = match[1].split('|').map(cell => cell.trim());
+
+                    // 创建表格节点
+                    const tableNode = $createTableNode();
+                    const rowNode = $createTableRowNode();
+
+                    cellsText.forEach(cellText => {
+                        const cellNode = $createTableCellNode(1); // 普通单元格
+                        const { $createParagraphNode, $createTextNode } = require('lexical');
+                        const paragraphNode = $createParagraphNode();
+                        const textNode = $createTextNode(cellText);
+                        paragraphNode.append(textNode);
+                        cellNode.append(paragraphNode);
+                        rowNode.append(cellNode);
+                    });
+
+                    tableNode.append(rowNode);
+                    parentNode.append(tableNode);
+
+                    return true;
+                } catch (error) {
+                    console.error('Table creation error:', error);
+                    return false;
+                }
+            },
+            type: 'element',
+        };
+
+        // 重新排序transformers，确保CHECK_LIST优先级高于UNORDERED_LIST
+        return [
+            // 首先放置CHECK_LIST，确保checkbox优先匹配
+            CHECK_LIST,
+            // 然后是其他TRANSFORMERS（但要排除重复的CHECK_LIST）
+            ...TRANSFORMERS.filter(t => t !== CHECK_LIST),
+            // 最后是自定义的转换器
+            HR_TRANSFORMER,
+            UNDERLINE_TRANSFORMER,
+            IMAGE_TRANSFORMER,
+            TABLE_TRANSFORMER
+        ];
+    }
+
+    /**
      * 将 markdown 内容转换为 Lexical 编辑器的 JSON 格式
      * 使用临时的 Lexical 编辑器实例进行转换
      */
@@ -77,13 +233,65 @@ class LexicalMarkdownProcessor {
         try {
             // 动态导入 Lexical 相关模块
             const { createEditor } = await import('lexical');
-            const { $convertFromMarkdownString, TRANSFORMERS } = await import('@lexical/markdown');
+            const {
+                $convertFromMarkdownString,
+                TRANSFORMERS,
+                CHECK_LIST,
+                HEADING,
+                QUOTE,
+                CODE,
+                UNORDERED_LIST,
+                ORDERED_LIST,
+                BOLD_ITALIC_STAR,
+                BOLD_STAR,
+                ITALIC_STAR,
+                INLINE_CODE,
+                LINK,
+                HIGHLIGHT
+            } = await import('@lexical/markdown');
+            const { HeadingNode, QuoteNode } = await import('@lexical/rich-text');
+            const { ListNode, ListItemNode } = await import('@lexical/list');
+            const { CodeNode, CodeHighlightNode } = await import('@lexical/code');
+            const { LinkNode, AutoLinkNode } = await import('@lexical/link');
+            const { MarkNode } = await import('@lexical/mark');
+            const { TableNode, TableCellNode, TableRowNode } = await import('@lexical/table');
+            const { HorizontalRuleNode } = await import('@lexical/react/LexicalHorizontalRuleNode');
 
-            // 创建临时编辑器实例
+            // 创建与主编辑器相同的转换器配置
+            const COMPLETE_TRANSFORMERS = await this.createEditorTransformers();
+
+            // 动态导入Table相关功能
+            const {
+                registerTableCellUnmergeTransform,
+                INSERT_TABLE_COMMAND,
+                $createTableNode,
+                $createTableRowNode,
+                $createTableCellNode
+            } = await import('@lexical/table');
+
+            // 创建临时编辑器实例，包含所有必要的节点
             const tempEditor = createEditor({
-                nodes: [], // 使用默认节点
+                nodes: [
+                    HeadingNode,
+                    QuoteNode,
+                    ListNode,
+                    ListItemNode,
+                    CodeNode,
+                    CodeHighlightNode,
+                    LinkNode,
+                    AutoLinkNode,
+                    MarkNode,
+                    TableNode,
+                    TableCellNode,
+                    TableRowNode,
+                    HorizontalRuleNode,
+                    // 注意：自定义节点在前端可能需要特殊处理
+                ],
                 onError: (error) => console.error('Temp editor error:', error),
             });
+
+            // 注册Table相关功能
+            const unregisterTableTransform = registerTableCellUnmergeTransform(tempEditor);
 
             let jsonResult = '';
 
@@ -94,7 +302,7 @@ class LexicalMarkdownProcessor {
                     const cleanMarkdown = this.processMarkdown(markdown);
 
                     // 将 markdown 转换为 Lexical AST
-                    $convertFromMarkdownString(cleanMarkdown, TRANSFORMERS);
+                    $convertFromMarkdownString(cleanMarkdown, COMPLETE_TRANSFORMERS);
                     resolve();
                 });
             });
