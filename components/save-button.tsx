@@ -109,24 +109,17 @@ const SaveButton: FC<SaveButtonProps> = ({ className }) => {
             try {
                 const localNote = await noteCache.getItem(note.id);
                 if (localNote) {
-                    // 使用content-hash检测IndexedDB内容是否发生变化
+                    // 完全依赖content-hash检测IndexedDB内容是否发生变化
                     if (localContentComparator.hasChanged(localNote.content)) {
-                        // IndexedDB内容发生了变化，说明编辑器有新的保存
-                        if (localNote.content !== note.content) {
-                            // 且与服务器状态不同，需要保存到服务器
-                            if (!isEditing) {
-                                isEditing = true;
-                                setSyncStatus('save');
-                            }
-                        } else {
-                            // IndexedDB与服务器状态相同，已同步
-                            if (isEditing) {
-                                isEditing = false;
-                                setSyncStatus('view');
-                            }
+                        console.log('🔍 SaveButton: IndexedDB内容发生变化，设置状态为save');
+                        // 内容发生变化，需要保存
+                        if (!isEditing) {
+                            isEditing = true;
+                            setSyncStatus('save');
                         }
                     }
-                    // 如果content-hash没有变化，说明IndexedDB内容没变，不需要检查
+                    // 注意：这里不再检查 localNote.content !== note.content
+                    // 完全依赖content-hash来判断是否有变化
                 } else {
                     // 没有本地缓存，设置为view状态
                     if (isEditing) {
@@ -135,7 +128,7 @@ const SaveButton: FC<SaveButtonProps> = ({ className }) => {
                     }
                 }
             } catch (error) {
-                // 忽略错误，保持当前状态
+                console.error('SaveButton检查错误:', error);
             }
         };
 
@@ -147,14 +140,9 @@ const SaveButton: FC<SaveButtonProps> = ({ className }) => {
                     // 设置初始基准，避免第一次检查时误判
                     localContentComparator.updateBaseline(localNote.content);
 
-                    // 检查初始状态
-                    if (localNote.content !== note.content) {
-                        setSyncStatus('save');
-                        isEditing = true;
-                    } else {
-                        setSyncStatus('view');
-                        isEditing = false;
-                    }
+                    // 初始状态始终为view，完全依赖content-hash检测变化
+                    setSyncStatus('view');
+                    isEditing = false;
                 } else {
                     setSyncStatus('view');
                     isEditing = false;

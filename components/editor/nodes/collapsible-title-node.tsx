@@ -1,9 +1,15 @@
 /**
- * Collapsible Title Node for Lexical
- * Based on Lexical playground implementation
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
  */
 
+import { IS_CHROME } from '@lexical/utils';
 import {
+    $createParagraphNode,
+    $isElementNode,
     DOMConversionMap,
     DOMConversionOutput,
     DOMExportOutput,
@@ -11,16 +17,17 @@ import {
     ElementNode,
     LexicalEditor,
     LexicalNode,
-    NodeKey,
+    RangeSelection,
     SerializedElementNode,
 } from 'lexical';
-import { render } from 'react-dom';
-import React from 'react';
-import { ChevronRightIcon } from '@heroicons/react/outline';
+
+import { $isCollapsibleContainerNode } from './collapsible-container-node';
 
 export type SerializedCollapsibleTitleNode = SerializedElementNode;
 
-export function $convertCollapsibleTitleElement(): DOMConversionOutput | null {
+export function $convertSummaryElement(
+    domNode: HTMLElement,
+): DOMConversionOutput | null {
     const node = $createCollapsibleTitleNode();
     return {
         node,
@@ -38,37 +45,32 @@ export class CollapsibleTitleNode extends ElementNode {
 
     createDOM(config: EditorConfig, editor: LexicalEditor): HTMLElement {
         const dom = document.createElement('summary');
-        dom.classList.add('collapsible-title');
+        dom.classList.add('Collapsible__title');
 
-        // 创建图标容器
-        const iconContainer = document.createElement('span');
-        iconContainer.classList.add('collapsible-icon');
-        iconContainer.style.marginRight = '0.5rem';
-        iconContainer.style.display = 'inline-flex';
-        iconContainer.style.alignItems = 'center';
-        iconContainer.style.transition = 'transform 0.2s ease';
+        // 创建图标元素 - 使用纯DOM而非React渲染
+        const iconElement = document.createElement('span');
+        iconElement.classList.add('Collapsible__icon');
+        iconElement.innerHTML = `
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+        `;
 
-        // 使用React渲染图标
-        render(React.createElement(ChevronRightIcon, { className: 'w-4 h-4' }), iconContainer);
+        dom.appendChild(iconElement);
 
-        dom.appendChild(iconContainer);
-
-        // 监听父容器的toggle事件来旋转图标
-        const updateIcon = () => {
-            const details = dom.closest('details');
-            if (details) {
-                iconContainer.style.transform = details.open ? 'rotate(90deg)' : 'rotate(0deg)';
-            }
-        };
-
-        // 初始状态
-        setTimeout(updateIcon, 0);
-
-        // 监听toggle事件
-        dom.addEventListener('click', () => {
-            setTimeout(updateIcon, 0);
-        });
-
+        if (IS_CHROME) {
+            dom.addEventListener('click', () => {
+                editor.update(() => {
+                    const collapsibleContainer = this.getLatest().getParentOrThrow();
+                    if (!$isCollapsibleContainerNode(collapsibleContainer)) {
+                        throw new Error(
+                            'Expected parent node to be a CollapsibleContainerNode',
+                        );
+                    }
+                    collapsibleContainer.toggleOpen();
+                });
+            });
+        }
         return dom;
     }
 
@@ -78,12 +80,10 @@ export class CollapsibleTitleNode extends ElementNode {
 
     static importDOM(): DOMConversionMap | null {
         return {
-            summary: () => {
-                return {
-                    conversion: $convertCollapsibleTitleElement,
-                    priority: 1,
-                };
-            },
+            summary: () => ({
+                conversion: $convertSummaryElement,
+                priority: 1,
+            }),
         };
     }
 
@@ -93,7 +93,7 @@ export class CollapsibleTitleNode extends ElementNode {
 
     exportDOM(): DOMExportOutput {
         const element = document.createElement('summary');
-        element.classList.add('collapsible-title');
+        element.classList.add('Collapsible__title');
         return { element };
     }
 
@@ -103,6 +103,37 @@ export class CollapsibleTitleNode extends ElementNode {
             type: 'collapsible-title',
             version: 1,
         };
+    }
+
+    insertNewAfter(_: RangeSelection, restoreSelection = true): ElementNode {
+        const containerNode = this.getParentOrThrow();
+        if (!$isCollapsibleContainerNode(containerNode)) {
+            throw new Error(
+                'CollapsibleTitleNode expects to be child of CollapsibleContainerNode',
+            );
+        }
+
+        if (containerNode.getOpen()) {
+            const contentNode = this.getNextSibling();
+            if (!contentNode || contentNode.getType() !== 'collapsible-content') {
+                throw new Error(
+                    'CollapsibleTitleNode expects to have CollapsibleContentNode sibling',
+                );
+            }
+
+            const firstChild = contentNode.getFirstChild();
+            if ($isElementNode(firstChild)) {
+                return firstChild;
+            } else {
+                const paragraph = $createParagraphNode();
+                (contentNode as ElementNode).append(paragraph);
+                return paragraph;
+            }
+        } else {
+            const paragraph = $createParagraphNode();
+            containerNode.insertAfter(paragraph, restoreSelection);
+            return paragraph;
+        }
     }
 
     collapseAtStart(): true {

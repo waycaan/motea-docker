@@ -13,11 +13,13 @@ const TextAlignPlugin = lazy(() => import('./text-align-plugin'));
 interface LazyPluginLoaderProps {
     enableTable?: boolean;
     enableTextAlign?: boolean;
+    forceLoad?: boolean; // 强制立即加载，用于导入等场景
 }
 
-export default function LazyPluginLoader({ 
-    enableTable = false, 
-    enableTextAlign = false 
+export default function LazyPluginLoader({
+    enableTable = false,
+    enableTextAlign = false,
+    forceLoad = false
 }: LazyPluginLoaderProps) {
     const [editor] = useLexicalComposerContext();
     const [shouldLoadTable, setShouldLoadTable] = useState(false);
@@ -35,6 +37,12 @@ export default function LazyPluginLoader({
                 setShouldLoadTextAlign(true);
             }
         };
+
+        // 如果forceLoad为true，立即加载
+        if (forceLoad) {
+            handleUserInteraction();
+            return;
+        }
 
         // Load on first focus or after a short delay
         const timeoutId = setTimeout(() => {

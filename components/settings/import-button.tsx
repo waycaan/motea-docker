@@ -8,6 +8,7 @@ import { ROOT_ID } from 'libs/shared/tree';
 import NoteState from 'libs/web/state/note';
 import { NoteModel } from 'libs/shared/note';
 import lexicalMarkdownProcessor from 'libs/web/utils/markdown-processor';
+import { parseMarkdownTitle } from 'libs/shared/markdown/parse-markdown-title';
 
 const readFileAsText = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {

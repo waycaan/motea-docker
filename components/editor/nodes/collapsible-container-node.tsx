@@ -1,35 +1,46 @@
 /**
- * Collapsible Container Node for Lexical
- * Based on Lexical playground implementation
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
  */
 
+import { IS_CHROME } from '@lexical/utils';
 import {
+    $getSiblingCaret,
+    $isElementNode,
+    $rewindSiblingCaret,
     DOMConversionMap,
     DOMConversionOutput,
     DOMExportOutput,
     EditorConfig,
     ElementNode,
+    isHTMLElement,
     LexicalEditor,
     LexicalNode,
     NodeKey,
+    RangeSelection,
     SerializedElementNode,
     Spread,
 } from 'lexical';
 
-import { $createCollapsibleContentNode, CollapsibleContentNode } from './collapsible-content-node';
-import { $createCollapsibleTitleNode, CollapsibleTitleNode } from './collapsible-title-node';
+function setDomHiddenUntilFound(dom: HTMLElement): void {
+    // @ts-ignore
+    dom.hidden = 'until-found';
+}
 
-export type SerializedCollapsibleContainerNode = Spread<
+type SerializedCollapsibleContainerNode = Spread<
     {
         open: boolean;
     },
     SerializedElementNode
 >;
 
-export function $convertCollapsibleContainerElement(
-    domNode: HTMLElement,
+export function $convertDetailsElement(
+    domNode: HTMLDetailsElement,
 ): DOMConversionOutput | null {
-    const isOpen = domNode.hasAttribute('open');
+    const isOpen = domNode.open !== undefined ? domNode.open : true;
     const node = $createCollapsibleContainerNode(isOpen);
     return {
         node,
@@ -52,54 +63,99 @@ export class CollapsibleContainerNode extends ElementNode {
         return new CollapsibleContainerNode(node.__open, node.__key);
     }
 
+    isShadowRoot(): boolean {
+        return true;
+    }
+
+    collapseAtStart(selection: RangeSelection): boolean {
+        // Unwrap the CollapsibleContainerNode by replacing it with the children
+        // of its children (CollapsibleTitleNode, CollapsibleContentNode)
+        const nodesToInsert: LexicalNode[] = [];
+        for (const child of this.getChildren()) {
+            if ($isElementNode(child)) {
+                nodesToInsert.push(...child.getChildren());
+            }
+        }
+
+        const caret = $rewindSiblingCaret($getSiblingCaret(this, 'previous'));
+        caret.splice(1, nodesToInsert);
+
+        // Merge the first child of the CollapsibleTitleNode with the
+        // previous sibling of the CollapsibleContainerNode
+        const [firstChild] = nodesToInsert;
+        if (firstChild) {
+            firstChild.selectStart().deleteCharacter(true);
+        }
+
+        return true;
+    }
+
     createDOM(config: EditorConfig, editor: LexicalEditor): HTMLElement {
-        const dom = document.createElement('details');
-        dom.classList.add('collapsible-container');
-        dom.open = this.__open;
-
-        // 使用节点key来安全地获取最新的节点实例
-        const nodeKey = this.getKey();
-
-        dom.addEventListener('toggle', () => {
-            editor.update(() => {
-                const node = editor.getEditorState()._nodeMap.get(nodeKey);
-                if (node && node instanceof CollapsibleContainerNode) {
-                    const currentOpen = node.__open;
-                    if (currentOpen !== dom.open) {
-                        node.setOpen(dom.open);
-                    }
+        // details is not well supported in Chrome #5582
+        let dom: HTMLElement;
+        if (IS_CHROME) {
+            dom = document.createElement('div');
+            dom.setAttribute('open', '');
+        } else {
+            const detailsDom = document.createElement('details');
+            detailsDom.open = this.__open;
+            detailsDom.addEventListener('toggle', () => {
+                const open = editor.getEditorState().read(() => this.getOpen());
+                if (open !== detailsDom.open) {
+                    editor.update(() => this.toggleOpen());
                 }
             });
-        });
+            dom = detailsDom;
+        }
+        dom.classList.add('Collapsible__container');
         return dom;
     }
 
-    updateDOM(prevNode: CollapsibleContainerNode, dom: HTMLDetailsElement): boolean {
-        if (prevNode.__open !== this.__open) {
-            dom.open = this.__open;
+    updateDOM(prevNode: this, dom: HTMLDetailsElement): boolean {
+        const currentOpen = this.__open;
+        if (prevNode.__open !== currentOpen) {
+            // details is not well supported in Chrome #5582
+            if (IS_CHROME) {
+                const contentDom = dom.children[1];
+                if (!isHTMLElement(contentDom)) {
+                    throw new Error('Expected contentDom to be an HTMLElement');
+                }
+                if (currentOpen) {
+                    dom.setAttribute('open', '');
+                    contentDom.hidden = false;
+                } else {
+                    dom.removeAttribute('open');
+                    setDomHiddenUntilFound(contentDom);
+                }
+            } else {
+                dom.open = this.__open;
+            }
         }
         return false;
     }
 
     static importDOM(): DOMConversionMap | null {
         return {
-            details: (domNode: HTMLElement) => {
+            details: (domNode: HTMLDetailsElement) => {
                 return {
-                    conversion: $convertCollapsibleContainerElement,
+                    conversion: $convertDetailsElement,
                     priority: 1,
                 };
             },
         };
     }
 
-    static importJSON(serializedNode: SerializedCollapsibleContainerNode): CollapsibleContainerNode {
-        const { open } = serializedNode;
-        return $createCollapsibleContainerNode(open);
+    static importJSON(
+        serializedNode: SerializedCollapsibleContainerNode,
+    ): CollapsibleContainerNode {
+        return $createCollapsibleContainerNode(serializedNode.open).updateFromJSON(
+            serializedNode,
+        );
     }
 
     exportDOM(): DOMExportOutput {
         const element = document.createElement('details');
-        element.classList.add('collapsible-container');
+        element.classList.add('Collapsible__container');
         element.setAttribute('open', this.__open.toString());
         return { element };
     }
@@ -108,8 +164,6 @@ export class CollapsibleContainerNode extends ElementNode {
         return {
             ...super.exportJSON(),
             open: this.__open,
-            type: 'collapsible-container',
-            version: 1,
         };
     }
 

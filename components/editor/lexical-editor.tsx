@@ -38,6 +38,7 @@ import IMEPlugin from './plugins/ime-plugin';
 import CodeBlockPlugin from './plugins/code-block-plugin';
 import CollapsiblePlugin from './plugins/collapsible-plugin';
 import LazyPluginLoader from './plugins/lazy-plugin-loader';
+import EnhancedDeletePlugin from './plugins/enhanced-delete-plugin';
 import { ImageNode, $createImageNode, $isImageNode } from './nodes/image-node';
 import { HorizontalRuleNode, $isHorizontalRuleNode, $createHorizontalRuleNode } from '@lexical/react/LexicalHorizontalRuleNode';
 import { HorizontalRulePlugin } from '@lexical/react/LexicalHorizontalRulePlugin';
@@ -543,6 +544,7 @@ const LexicalEditor = forwardRef<LexicalEditorRef, LexicalEditorProps>(({
                     <HighlightPlugin />
                     <CodeBlockPlugin />
                     <CollapsiblePlugin />
+                    <EnhancedDeletePlugin />
                     <LazyPluginLoader enableTable={true} enableTextAlign={true} />
                     <IMEPlugin enabled={true} debug={process.env.NODE_ENV === 'development'} />
 

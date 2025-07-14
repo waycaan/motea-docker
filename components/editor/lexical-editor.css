@@ -289,59 +289,7 @@
     list-style-type: none;
 }
 
-/* Task List Styles */
-.task-list {
-    list-style: none;
-    padding-left: 0;
-    margin: 1rem 0;
-}
-
-.task-item {
-    display: flex;
-    align-items: flex-start;
-    margin: 0.5rem 0;
-    list-style: none;
-}
-
-.task-checkbox {
-    margin-right: 0.5rem;
-    margin-top: 0.125rem;
-    cursor: pointer;
-    width: 1rem;
-    height: 1rem;
-    border: 1px solid #d1d5db;
-    border-radius: 0.25rem;
-    background: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    appearance: none;
-    -webkit-appearance: none;
-}
-
-.task-checkbox:checked {
-    background-color: #3b82f6;
-    border-color: #3b82f6;
-    color: white;
-}
-
-.task-checkbox:checked::after {
-    content: '✓';
-    font-size: 0.75rem;
-    font-weight: bold;
-    color: white;
-}
-
-.task-content {
-    flex: 1;
-    line-height: 1.7;
-}
-
-.task-item[data-checked="true"] .task-content {
-    text-decoration: line-through;
-    opacity: 0.6;
-}
+/* 废弃的Task List Styles已删除 */
 
 /* Highlight Styles */
 mark {
@@ -398,15 +346,15 @@ mark {
     font-weight: bold;
 }
 
-/* Collapsible Container Styles */
-.collapsible-container {
+/* Collapsible Container Styles - Lexical Official */
+.Collapsible__container {
     border: 1px solid #d4d4d8;
     border-radius: 0.5rem;
     margin: 1rem 0;
     overflow: hidden;
 }
 
-.collapsible-title {
+.Collapsible__title {
     background-color: #f4f4f5;
     color: black;
     padding: 0.75rem 1rem;
@@ -418,21 +366,30 @@ mark {
     list-style: none;
     display: flex;
     align-items: center;
+    margin: 0;
 }
 
-.collapsible-title::-webkit-details-marker {
+.Collapsible__title::-webkit-details-marker {
     display: none;
 }
 
-.collapsible-title::marker {
+.Collapsible__title::marker {
     display: none;
 }
 
-.collapsible-icon {
+.Collapsible__icon {
     flex-shrink: 0;
+    margin-right: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    transition: transform 0.2s ease;
 }
 
-.collapsible-content {
+.Collapsible__container[open] .Collapsible__icon {
+    transform: rotate(90deg);
+}
+
+.Collapsible__content {
     padding: 1rem;
     background-color: #fafafa;
     color: black;
@@ -455,23 +412,57 @@ mark {
     color: #6b7280;
 }
 
-/* Lexical CheckList styles */
+/* Lexical CheckList styles - 修复对齐问题 */
 .lexical-editor .editor-listitem-checked,
 .lexical-editor .editor-listitem-unchecked {
     position: relative;
-    margin-left: 0.5em;
-    margin-right: 0.5em;
-    padding-left: 1.5em;
-    padding-right: 1.5em;
+    margin: 0.5rem 0;  /* 与普通列表项相同的margin */
+    padding-left: 1.5rem;  /* 与普通列表相同的padding，使用rem单位 */
+    padding-right: 0;
     list-style-type: none;
     outline: none;
     display: block;
     min-height: 1.5em;
+    line-height: 1.6;  /* 与普通列表项相同的行高 */
+}
+
+/* 确保tasklist项与普通列表项完全对齐 */
+.editor-listitem.editor-listitem-checked,
+.editor-listitem.editor-listitem-unchecked {
+    margin: 0.5rem 0;  /* 与其他列表项相同的margin */
+    padding-left: 1.5rem;  /* 与普通列表相同的padding */
+    line-height: 1.6;  /* 与普通列表项相同的行高 */
+}
+
+/* 确保tasklist的缩进样式与普通列表一致 */
+.editor-listitem.editor-listitem-checked[data-lexical-indent="1"],
+.editor-listitem.editor-listitem-unchecked[data-lexical-indent="1"] {
+    margin-left: 40px;
+}
+
+.editor-listitem.editor-listitem-checked[data-lexical-indent="2"],
+.editor-listitem.editor-listitem-unchecked[data-lexical-indent="2"] {
+    margin-left: 80px;
+}
+
+.editor-listitem.editor-listitem-checked[data-lexical-indent="3"],
+.editor-listitem.editor-listitem-unchecked[data-lexical-indent="3"] {
+    margin-left: 120px;
+}
+
+.editor-listitem.editor-listitem-checked[data-lexical-indent="4"],
+.editor-listitem.editor-listitem-unchecked[data-lexical-indent="4"] {
+    margin-left: 160px;
+}
+
+.editor-listitem.editor-listitem-checked[data-lexical-indent="5"],
+.editor-listitem.editor-listitem-unchecked[data-lexical-indent="5"] {
+    margin-left: 200px;
 }
 
 .lexical-editor .editor-listitem-checked > *,
 .lexical-editor .editor-listitem-unchecked > * {
-    margin-left: 0.01em;
+    margin-left: 0;  /* 移除额外的左边距 */
 }
 
 .lexical-editor .editor-listitem-unchecked:before,
@@ -480,7 +471,7 @@ mark {
     width: 0.9em;
     height: 0.9em;
     top: 50%;
-    left: 0;
+    left: 0.3em;  /* 调整位置以匹配普通列表的bullet位置 */
     transform: translateY(-50%);
     position: absolute;
     border: 1px solid #d1d5db;
@@ -497,7 +488,7 @@ mark {
 .lexical-editor .editor-listitem-checked:after {
     content: '✓';
     position: absolute;
-    left: 0.125em;
+    left: 0.425em;  /* 调整以匹配checkbox的新位置 */
     top: 50%;
     transform: translateY(-50%);
     color: white;
@@ -554,16 +545,16 @@ mark {
     color: white !important;
 }
 
-.dark .collapsible-container {
+.dark .Collapsible__container {
     border-color: #52525b !important;
 }
 
-.dark .collapsible-title {
+.dark .Collapsible__title {
     background-color: #3f3f46 !important;
     color: white !important;
 }
 
-.dark .collapsible-content {
+.dark .Collapsible__content {
     background-color: #27272a !important;
     color: white !important;
 }
